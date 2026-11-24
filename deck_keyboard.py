@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Kompaktowa klawiatura ekranowa dla Steam Deck (tryb pulpitu).
+"""Compact on-screen keyboard for the Steam Deck desktop.
 
-Klawisze idą do jądra przez /dev/uinput, więc trafiają do okna, które już
-jest aktywne. Okno klawiatury nie przyjmuje fokusu (flagi Qt + reguła KWin).
+Keys are injected through /dev/uinput, so they reach the window that is
+already focused. The keyboard window does not take focus (Qt flags plus a KWin rule).
 """
 
 from __future__ import annotations
@@ -24,10 +24,10 @@ SERVER_NAME = "deck-keyboard"
 RULE_MARKER = "deck-keyboard-nofocus"
 BLUE = (28, 73, 149)
 COLUMNS = 60
-WIDTH_PRESETS = (("Mała", 640), ("Kompaktowa", 760), ("Większa", 980))
-ALPHA_PRESETS = (("30%", 77), ("50%", 128), ("70%", 179), ("Pełne", 255))
+WIDTH_PRESETS = (("Small", 640), ("Compact", 760), ("Large", 980))
+ALPHA_PRESETS = (("30%", 77), ("50%", 128), ("70%", 179), ("100%", 255))
 
-# (etykieta, akcja, szerokość w kolumnach). Suma szerokości w rzędzie = 60.
+# (label, action, width in columns). Each row sums to 60.
 ROWS: list[list[tuple[str, str, int]]] = [
     [
         ("`", "key:`", 4),
@@ -187,7 +187,7 @@ def save_settings(data: dict) -> None:
         temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         temporary.replace(path)
     except OSError as exc:
-        log(f"nie zapisano ustawień: {exc}")
+        log(f"could not save settings: {exc}")
 
 
 def script_path() -> Path:
@@ -208,9 +208,9 @@ def desktop_text(hidden: bool) -> str:
         "[Desktop Entry]\n"
         "Type=Application\n"
         "Version=1.0\n"
-        "Name=Klawiatura\n"
-        "GenericName=Wirtualna klawiatura\n"
-        "Comment=Kompaktowa klawiatura ekranowa, która nie przejmuje aktywnego okna\n"
+        "Name=Keyboard\n"
+        "GenericName=On-screen keyboard\n"
+        "Comment=Compact on-screen keyboard that does not steal focus\n"
         f"Exec={command}\n"
         f"Icon={icon}\n"
         "Terminal=false\n"
@@ -235,7 +235,7 @@ def install_desktop_files() -> None:
     autostart_path().parent.mkdir(parents=True, exist_ok=True)
     applications_path().write_text(desktop_text(False), encoding="utf-8")
     autostart_path().write_text(desktop_text(True), encoding="utf-8")
-    print(f"Skrót: {applications_path()}")
+    print(f"Shortcut: {applications_path()}")
     print(f"Autostart: {autostart_path()}")
 
 
@@ -387,7 +387,7 @@ def reconfigure_kwin() -> None:
 
 def install_kwin_rule() -> None:
     if sys.platform != "linux":
-        print("Reguła KWin jest potrzebna tylko na Linuksie.")
+        print("The KWin rule is only needed on Linux.")
         return
     path = Path.home() / ".config" / "kwinrulesrc"
     raw = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -401,29 +401,29 @@ def install_kwin_rule() -> None:
             shutil.copy(path, backup)
     path.write_text(merged, encoding="utf-8")
     reconfigure_kwin()
-    print(f"Dodano regułę KWin: {path}")
+    print(f"Added KWin rule: {path}")
 
 
 def validate_layout() -> None:
     if len(ROWS) != 5:
-        raise AssertionError(f"oczekiwano 5 rzędów, jest {len(ROWS)}")
+        raise AssertionError(f"expected 5 rows, got {len(ROWS)}")
     for index, row in enumerate(ROWS):
         total = sum(span for _, _, span in row)
         if total != COLUMNS:
-            raise AssertionError(f"rząd {index} ma szerokość {total}, nie {COLUMNS}")
+            raise AssertionError(f"row {index} width is {total}, not {COLUMNS}")
         for _label, action, _span in row:
             if action.startswith("key:"):
                 token = action[4:]
                 if token not in KEY_OF:
-                    raise AssertionError(f"brak kodu dla {token!r}")
+                    raise AssertionError(f"no keycode for {token!r}")
             elif action.startswith("text:"):
                 for character in action[5:]:
                     if character == "@":
                         continue
                     if character.lower() not in KEY_OF and character not in KEY_OF:
-                        raise AssertionError(f"brak kodu dla {character!r}")
+                        raise AssertionError(f"no keycode for {character!r}")
             elif action not in {"shift", "caps"}:
-                raise AssertionError(f"nieznana akcja {action}")
+                raise AssertionError(f"unknown action {action}")
 
 
 def run_self_tests() -> None:
@@ -435,8 +435,8 @@ def run_self_tests() -> None:
             "count=1",
             "",
             "[1]",
-            "Description=Stara reguła",
-            "title=Cos",
+            "Description=Old rule",
+            "title=Something",
             "titlematch=2",
             "",
         ]
@@ -481,7 +481,7 @@ def run_self_tests() -> None:
 
 
 class KeyEmitter:
-    """Wstrzykuje zdarzenia klawiatury przez uinput (działa na X11 i Wayland)."""
+    """Injects key events through uinput (works on X11 and Wayland)."""
 
     def __init__(self) -> None:
         self.ui = None
@@ -492,21 +492,21 @@ class KeyEmitter:
 
     def _open(self) -> None:
         if sys.platform != "linux":
-            self.error = "Wpisywanie działa na Steam Decku w trybie pulpitu (Linux)."
+            self.error = "Typing works on the Steam Deck desktop (Linux)."
             return
         try:
             from evdev import UInput, ecodes as codes
         except ImportError:
-            self.error = "Brak biblioteki evdev. W terminalu uruchom ./install.sh"
+            self.error = "The evdev library is missing. Run ./install.sh"
             return
         self._e = codes
         if not os.path.exists("/dev/uinput"):
-            self.error = "Nie ma /dev/uinput. W terminalu uruchom ./install.sh"
+            self.error = "/dev/uinput is missing. Run ./install.sh"
             return
         if not os.access("/dev/uinput", os.W_OK):
             self.error = (
-                "Brak prawa zapisu do /dev/uinput. "
-                "W terminalu uruchom ./install.sh i zaloguj się ponownie do pulpitu."
+                "Cannot write to /dev/uinput. "
+                "Run ./install.sh, then log out of the desktop and back in."
             )
             return
         names = set(KEY_OF.values())
@@ -516,7 +516,7 @@ class KeyEmitter:
             self.ui = UInput({codes.EV_KEY: keys}, name="Deck Keyboard")
         except OSError as exc:
             log(f"uinput: {exc!r}")
-            self.error = "Nie udało się włączyć wpisywania. Uruchom ./install.sh"
+            self.error = "Could not enable typing. Run ./install.sh"
             self.ui = None
 
     def press(self, code_name: str, shift: bool = False) -> bool:
@@ -532,8 +532,8 @@ class KeyEmitter:
             self.ui.write(codes.EV_KEY, code, 1)
             self.ui.syn()
         except OSError as exc:
-            log(f"zapis klawisza: {exc!r}")
-            self.error = "Wpisywanie przerwało się. Uruchom klawiaturę ponownie."
+            log(f"key write failed: {exc!r}")
+            self.error = "Typing stopped. Start the keyboard again."
             self.held = None
             return False
         self.held = (code, shift)
@@ -552,7 +552,7 @@ class KeyEmitter:
                 self.ui.write(codes.EV_KEY, codes.KEY_LEFTSHIFT, 0)
             self.ui.syn()
         except OSError as exc:
-            log(f"puszczenie klawisza: {exc!r}")
+            log(f"key release failed: {exc!r}")
 
     def tap(self, code_name: str, shift: bool = False) -> bool:
         self.release()
@@ -1077,9 +1077,9 @@ if HAS_QT:
             self._warned = True
             log(self.emitter.error)
             if self.tray is not None:
-                self.tray.showMessage("Klawiatura", self.emitter.error, QSystemTrayIcon.MessageIcon.Warning, 8000)
+                self.tray.showMessage("Keyboard", self.emitter.error, QSystemTrayIcon.MessageIcon.Warning, 8000)
                 self.tray.setIcon(build_icon(error=True))
-                self.tray.setToolTip("Klawiatura — " + self.emitter.error)
+                self.tray.setToolTip("Keyboard — " + self.emitter.error)
 
         def setup_tray(self) -> None:
             if QSystemTrayIcon.isSystemTrayAvailable():
@@ -1089,23 +1089,23 @@ if HAS_QT:
             if self._tray_tries < 30:
                 QTimer.singleShot(1000, self.setup_tray)
             else:
-                log("brak zasobnika systemowego, zostawiam okno otwarte")
+                log("no system tray, leaving the window open")
                 self.show_keyboard()
 
         def create_tray(self) -> None:
             tray = QSystemTrayIcon(build_icon(bool(self.emitter.error)), self)
             tray.setToolTip(
-                "Klawiatura\n"
-                "Kliknij ikonę, żeby pokazać albo schować.\n"
-                "Przeciąganie: prawy przycisk albo niebieskie tło."
+                "Keyboard\n"
+                "Click the icon to show or hide it.\n"
+                "Drag with the right button, or from the blue background."
             )
             menu = QMenu()
-            self.toggle_action = QAction("Pokaż", menu)
+            self.toggle_action = QAction("Show", menu)
             self.toggle_action.triggered.connect(self.toggle)
             menu.addAction(self.toggle_action)
             menu.addSeparator()
 
-            alpha_menu = menu.addMenu("Przezroczystość tła")
+            alpha_menu = menu.addMenu("Background opacity")
             alpha_group = QActionGroup(alpha_menu)
             alpha_group.setExclusive(True)
             for label, alpha in ALPHA_PRESETS:
@@ -1116,14 +1116,14 @@ if HAS_QT:
                 alpha_group.addAction(action)
                 alpha_menu.addAction(action)
 
-            ghost = QAction("Klawisze też półprzezroczyste", menu)
+            ghost = QAction("Make keys semi-transparent too", menu)
             ghost.setCheckable(True)
             ghost.setChecked(self.ghost_keys)
             ghost.toggled.connect(self.apply_ghost)
             menu.addAction(ghost)
             menu.addSeparator()
 
-            size_menu = menu.addMenu("Rozmiar")
+            size_menu = menu.addMenu("Size")
             size_group = QActionGroup(size_menu)
             size_group.setExclusive(True)
             for label, width in WIDTH_PRESETS:
@@ -1135,14 +1135,14 @@ if HAS_QT:
                 size_menu.addAction(action)
             menu.addSeparator()
 
-            autostart = QAction("Uruchamiaj przy logowaniu", menu)
+            autostart = QAction("Start at login", menu)
             autostart.setCheckable(True)
             autostart.setChecked(autostart_path().exists())
             autostart.toggled.connect(set_autostart)
             menu.addAction(autostart)
             menu.addSeparator()
 
-            quit_action = QAction("Zamknij", menu)
+            quit_action = QAction("Quit", menu)
             quit_action.triggered.connect(self.quit)
             menu.addAction(quit_action)
             menu.aboutToShow.connect(self.sync_menu)
@@ -1165,7 +1165,7 @@ if HAS_QT:
 
         def sync_menu(self) -> None:
             if self.toggle_action is not None:
-                self.toggle_action.setText("Schowaj" if self.isVisible() else "Pokaż")
+                self.toggle_action.setText("Hide" if self.isVisible() else "Show")
 
         def listen_for_peers(self, show: bool) -> bool:
             socket = QLocalSocket()
@@ -1179,7 +1179,7 @@ if HAS_QT:
             QLocalServer.removeServer(SERVER_NAME)
             server = QLocalServer(self)
             if not server.listen(SERVER_NAME):
-                log(f"nie udało się zająć gniazda: {server.errorString()}")
+                log(f"could not claim the socket: {server.errorString()}")
             else:
                 server.newConnection.connect(self.on_peer)
             self._server = server
@@ -1320,7 +1320,7 @@ def run_gui(argv: list[str]) -> int:
     if "--render" in argv:
         index = argv.index("--render")
         if index + 1 >= len(argv):
-            print("Użycie: deck_keyboard.py --render plik.png", file=sys.stderr)
+            print("Usage: deck_keyboard.py --render file.png", file=sys.stderr)
             return 2
         render_path = argv[index + 1]
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -1329,11 +1329,11 @@ def run_gui(argv: list[str]) -> int:
         try:
             install_kwin_rule()
         except Exception as exc:  # noqa: BLE001
-            log(f"reguła KWin: {exc}")
+            log(f"KWin rule: {exc}")
 
     app = QApplication([sys.argv[0]])
     app.setApplicationName(APP_ID)
-    app.setApplicationDisplayName("Klawiatura")
+    app.setApplicationDisplayName("Keyboard")
     app.setOrganizationName(APP_ID)
     app.setQuitOnLastWindowClosed(False)
     try:
@@ -1382,7 +1382,7 @@ def main(argv: list[str] | None = None) -> int:
             install_desktop_files()
         return 0
     if not HAS_QT:
-        print("Brak PyQt6. Na Steam Decku, w trybie pulpitu, uruchom ./install.sh", file=sys.stderr)
+        print("PyQt6 is missing. On the Steam Deck desktop, run ./install.sh", file=sys.stderr)
         return 1
     return run_gui(argv)
 

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install keyboard
+GenericName=Installer
+Comment=Double-click. If asked, choose Run.
+TryExec=/usr/bin/bash
+Exec=/usr/bin/bash -c 'p="$0"; p="${p#file://}"; p="${p//%%20/ }"; d=$(dirname "$p"); cd "$d" && exec /usr/bin/bash ./install.sh || { echo "Cannot find the installer in: $d"; read -r -p "Press Enter..."; exit 1; }' %k
+Icon=system-software-install
+Terminal=true
+StartupNotify=false
+Categories=Utility;

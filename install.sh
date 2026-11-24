@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalator klawiatury. Uruchamia go plik „Zainstaluj” (dwa kliknięcia).
+# Keyboard installer. Double-click the Install file to run it.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,58 +9,58 @@ REQ="$DIR/requirements.txt"
 fail() {
   trap - ERR
   echo
-  echo "BŁĄD: $*"
+  echo "ERROR: $*"
   if command -v kdialog >/dev/null 2>&1; then
-    kdialog --title "Klawiatura" --error "$*" || true
+    kdialog --title "Keyboard" --error "$*" || true
   fi
   if [[ -t 0 ]]; then
-    read -r -p "Naciśnij Enter, żeby zamknąć..." _ || true
+    read -r -p "Press Enter to close..." _ || true
   fi
   exit 1
 }
 
-trap 'fail "Instalacja przerwała się. Jeśli wyżej jest błąd sieci, włącz Wi-Fi i kliknij Zainstaluj jeszcze raz."' ERR
+trap 'fail "Installation stopped. If the error above is about the network, turn on Wi-Fi and run Install again."' ERR
 
-printf '\033]0;Instalacja klawiatury\007'
+printf '\033]0;Keyboard installation\007'
 echo "============================================"
-echo "  Instalacja klawiatury na Steam Decku"
-echo "  Nie zamykaj tego okna aż do komunikatu"
-echo "  „Gotowe”."
+echo "  Installing the keyboard on a Steam Deck"
+echo "  Leave this window open until you see"
+echo "  Done."
 echo "============================================"
 echo
 
 if [[ "$(uname -s)" != "Linux" ]]; then
-  fail "To działa tylko na Steam Decku, w trybie pulpitu."
+  fail "This only works on a Steam Deck, in desktop mode."
 fi
 
 if command -v kdialog >/dev/null 2>&1; then
-  if ! kdialog --title "Klawiatura" --yesno "$(printf '%s\n' \
-    "Zainstalować klawiaturę na tym Steam Decku?" \
+  if ! kdialog --title "Keyboard" --yesno "$(printf '%s\n' \
+    "Install the keyboard on this Steam Deck?" \
     "" \
-    "Nie zamykaj czarnego okna, aż wyskoczy „Gotowe”." \
-    "Jak zapyta o hasło, wpisz je w czarnym oknie." \
-    "Litery hasła nie będą widoczne — to normalne.")"; then
-    echo "Anulowano."
+    "Leave the black window open until you see Done." \
+    "If it asks for a password, type it in the black window." \
+    "The letters stay hidden. That is normal.")"; then
+    echo "Cancelled."
     exit 0
   fi
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
-  fail "Brak Pythona. Zrób zdjęcie tego okna."
+  fail "Python is missing. Take a photo of this window."
 fi
 
-echo "Przygotowuję program (pierwszy raz może potrwać kilka minut)..."
+echo "Preparing the program. The first run can take a few minutes..."
 
 ensure_pip() {
   local py="$1"
   if "$py" -m pip --version >/dev/null 2>&1; then
     return 0
   fi
-  echo "Pobieram narzędzie do instalacji..."
+  echo "Downloading the install tool..."
   local tmp
   tmp="$(mktemp)"
-  curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp" || fail "Brak internetu. Włącz Wi-Fi i uruchom instalator jeszcze raz."
-  "$py" "$tmp" --user || "$py" "$tmp" || fail "Nie udało się pobrać narzędzi. Sprawdź Wi-Fi."
+  curl -fsSL https://bootstrap.pypa.io/get-pip.py -o "$tmp" || fail "No internet. Turn on Wi-Fi and run the installer again."
+  "$py" "$tmp" --user || "$py" "$tmp" || fail "Could not download the tools. Check Wi-Fi."
   rm -f "$tmp"
 }
 
@@ -70,16 +70,16 @@ fi
 if [[ ! -x "$VENV/bin/python" ]]; then
   rm -rf "$VENV"
   if ! python3 -m venv --system-site-packages "$VENV"; then
-    python3 -m venv --system-site-packages --without-pip "$VENV" || fail "Nie udało się przygotować Pythona."
+    python3 -m venv --system-site-packages --without-pip "$VENV" || fail "Could not prepare Python."
   fi
 fi
 
 ensure_pip "$VENV/bin/python"
 "$VENV/bin/python" -m pip install --upgrade pip
 if ! "$VENV/bin/python" -m pip install -r "$REQ"; then
-  echo "Pobieranie nie wyszło. Próbuję z systemu SteamOS..."
+  echo "Download failed. Trying the SteamOS packages..."
   sudo steamos-readonly disable || true
-  sudo pacman -S --needed --noconfirm python-pyqt6 python-evdev || fail "Nie udało się pobrać składników. Włącz Wi-Fi i spróbuj jeszcze raz."
+  sudo pacman -S --needed --noconfirm python-pyqt6 python-evdev || fail "Could not download the pieces. Turn on Wi-Fi and try again."
   sudo steamos-readonly enable || true
 fi
 
@@ -88,19 +88,19 @@ if ! "$PY" -c "import PyQt6" >/dev/null 2>&1; then
   if python3 -c "import PyQt6" >/dev/null 2>&1; then
     PY="python3"
   else
-    fail "Nie udało się zainstalować klawiatury. Włącz Wi-Fi i spróbuj jeszcze raz."
+    fail "Could not install the keyboard. Turn on Wi-Fi and try again."
   fi
 fi
 if ! "$PY" -c "import evdev" >/dev/null 2>&1; then
-  fail "Klawiatura jest w połowie zainstalowana, ale brakuje ostatniego składnika. Włącz Wi-Fi i spróbuj jeszcze raz."
+  fail "The keyboard is only partly installed. A piece is missing. Turn on Wi-Fi and try again."
 fi
 printf '%s\n' "$PY" > "$DIR/.python-cmd"
 
 echo
-echo "Jeszcze zgoda na wpisywanie klawiszy."
+echo "One more step: permission to type keys."
 if ! sudo -n true 2>/dev/null; then
-  echo "Jak wyskoczy hasło, wpisz hasło do trybu pulpitu."
-  echo "Nie zobaczysz liter — to normalne. Na końcu naciśnij Enter."
+  echo "If a password prompt appears, type your desktop password."
+  echo "You will not see the letters. That is normal. Press Enter at the end."
 fi
 if sudo -n true 2>/dev/null; then
   SUDO=(sudo -n)
@@ -120,7 +120,7 @@ if [[ -e /dev/uinput ]]; then
 fi
 
 "$PY" "$DIR/deck_keyboard.py" --install-rules --install-desktop
-chmod +x "$DIR/run.sh" "$DIR/install.sh" "$DIR/Zainstaluj.desktop" 2>/dev/null || true
+chmod +x "$DIR/run.sh" "$DIR/install.sh" "$DIR/Install.desktop" 2>/dev/null || true
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database "${HOME}/.local/share/applications" || true
 fi
@@ -137,20 +137,20 @@ fi
 
 trap - ERR
 echo
-echo "Gotowe."
+echo "Done."
 DONE="$(printf '%s\n' \
-  "Gotowe." \
+  "Done." \
   "" \
-  "Ikona klawiatury jest przy zegarze." \
-  "Lewe kliknięcie pokazuje ją i chowa." \
+  "The keyboard icon is by the clock." \
+  "Left-click shows it and hides it." \
   "" \
-  "Jak ikony nie widać, kliknij małą strzałkę przy zegarze i przeciągnij klawiaturę na pasek.")"
+  "If you do not see the icon, click the small arrow by the clock and drag the keyboard onto the bar.")"
 if [[ "$NEED_RELOGIN" == 1 ]]; then
-  DONE+=$'\n\n'"Wyloguj się z pulpitu i zaloguj jeszcze raz, żeby dało się pisać."
+  DONE+=$'\n\n'"Log out of the desktop and back in before typing will work."
 fi
 if command -v kdialog >/dev/null 2>&1; then
-  kdialog --title "Klawiatura" --msgbox "$DONE" || true
+  kdialog --title "Keyboard" --msgbox "$DONE" || true
 elif [[ -t 0 ]]; then
   echo "$DONE"
-  read -r -p "Naciśnij Enter, żeby zamknąć..." _ || true
+  read -r -p "Press Enter to close..." _ || true
 fi
